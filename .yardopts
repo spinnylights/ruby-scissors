@@ -1,0 +1,5 @@
+--charset    utf-8
+--readme     README.rdoc
+--output-dir yardoc
+-
+COPYING.md

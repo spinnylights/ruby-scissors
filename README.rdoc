@@ -1,0 +1,3 @@
+= RubyScissors
+
+RubyScissors is a library and command-line tool for making literary cut-ups, à la {William Burroughs}[http://www.writing.upenn.edu/~afilreis/88v/burroughs-cutup.html] or {Tristan Tzara}[http://www.in-vacua.com/tzara.shtml]. It is a Ruby port of my {Scissors.js}[https://github.com/spinnylights/scissors.js] library, which has an interface on my {website}[https://milky.flowers/programs/scissors/].
