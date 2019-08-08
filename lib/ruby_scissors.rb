@@ -18,254 +18,156 @@
 # You should have received a copy of the GNU General Public License
 # along with RubyScissors.  If not, see <https://www.gnu.org/licenses/>.
 
-'use strict';
+module RubyScissors
+  class Scissors
+    attr_reader :fodder
+    def initialize(fodder)
+      @fodder = fodder
+    end
 
-var Siz = {};
+    def reverse_words
+      get_words.reverse.join(' ')
+    end
 
-Siz.reverseWords = function(text) {
-  //var reverse = Array.prototype.reverse.bind(text);
-  //var reversedText = Siz._onWords(text, reverse);
+    def reverse_lines(cpl = pick_cpl)
+      get_lines(cpl).reverse.join('').strip
+    end
 
-  var toReverse = new Siz._Page(text);
-  return toReverse.reverseWords();
-}
+    def shuffle_words(shuffler = nil)
+      shuffled = []
+      if shuffler
+        shuffled = shuffler.call(get_words)
+      else
+        shuffled = get_words.shuffle
+      end
+      shuffled.join(' ')
+    end
 
-Siz.reverseLines = function(text, cpl) {
-  var toReverse = new Siz._Page(text, cpl);
-  return toReverse.reverseLines();
-}
+    def shuffle_lines(opts={})
+      shuffler = opts[:shuffler]
+      cpl = opts[:cpl] || pick_cpl
+      shuffled = []
+      if shuffler
+        shuffled = shuffler.call(get_lines(cpl))
+      else
+        shuffled = get_lines(cpl).shuffle
+      end
+      shuffled.join('').strip
+    end
 
-Siz.shuffleWords = function(text, shuffler) {
-  var toShuffle = new Siz._Page(text);
-  return toShuffle.shuffleWords(shuffler);
-}
+    def burr_split(opts={})
+      shuffler = opts[:shuffler] || default_shuffler
+      cpl = opts[:cpl] || pick_cpl
 
-Siz.shuffleLines = function(text, shuffler, cpl) {
-  var toShuffle = new Siz._Page(text, cpl);
-  return toShuffle.shuffleLines(shuffler)
-}
+      half_lines = get_half_lines(cpl)
 
-// Burroughs methods' args:
-//
-// text:     the text to be cut up.
-//
-// cpl:      (optional) the average number of characters per line on the
-//           "page" to be cut up. defaults to a random value between 35 
-//           and 95.
-//
-// shuffler: (optional) the function to use to shuffle the pieces of 
-//           the "page" after it's been cut into quarters. defaults
-//           to Underscore's shuffle(). 
+      burroughs(half_lines, shuffler: shuffler, cpl: cpl)
+    end
 
-Siz.burSpl = function(text, cpl, shuffler) {
-  var toCut = new Siz._Page(text, cpl);
-  return toCut.burroughs(shuffler, 'not around words');
-}
+    def burr_word(opts={})
+      shuffler = opts[:shuffler] || default_shuffler
+      cpl = opts[:cpl] || pick_cpl
 
-Siz.burWrd = function(text, cpl, shuffler) {
-  var toCut = new Siz._Page(text, cpl);
-  return toCut.burroughs(shuffler, 'around words');
-}
+      half_lines = get_half_lines_around_words(cpl)
 
-// non-public; these methods don't present a stable API, so if
-// you're an outside developer, depend on them at your own risk
+      burroughs(half_lines, shuffler: shuffler, cpl: cpl)
+    end
 
-Siz._Page = function(text, charsPerLine) {
-  this.text = text;
-  this.charsPerLine = charsPerLine;
+    private
 
-  if (typeof this.charsPerLine === 'undefined') {
-    this.charsPerLine = this.genCharsPerLine();
-  }
-}
+    def default_shuffler
+      lambda do |array|
+        array.shuffle
+      end
+    end
 
-Siz._Page.prototype.genCharsPerLine = function() {
-  var CPLs = _.range(35, 95);
+    def pick_cpl
+      (35..95).to_a.sample
+    end
 
-  return _.sample(CPLs);
-}
+    def get_words
+      fodder.split(/ /)
+    end
 
-Siz._Page.prototype.getWords = function() {
-  return this.text.split(' ');
-}
+    def get_lines(cpl = pick_cpl)
+      lines = []
+      split_string_arr = get_words
 
-Siz._Page.prototype.shuffleWords = function(shuffler) {
-  if (typeof shuffler === 'undefined') {
-    shuffler = _.shuffle;
-  }
-  
-  return shuffler(this.getWords()).join(' ');
-}
+      until (split_string_arr.empty?)
+        line = ""
+        while (line.length <= cpl)
+          if (split_string_arr.empty?)
+            line += ' '
+          else
+            line += split_string_arr.shift + ' '
+          end
+        end
+        lines.push(line)
+      end
+      lines
+    end
 
-Siz._Page.prototype.shuffleLines = function(shuffler) {
-  if (typeof shuffler === 'undefined') {
-    shuffler = _.shuffle;
-  }
-  
-  return shuffler(this.groupWordsByCharLimit()).join('').trim();
-}
+    def get_half_lines(cpl = pick_cpl)
+      half_lines = []
 
-Siz._Page.prototype.reverseWords = function() {
-  var reversed = this.getWords().reverse();
+      get_lines(cpl).each do |line|
+        midpoint = (line.length / 2.0).ceil
+        first = line.slice(0..midpoint-1)
+        second = line.slice(midpoint..line.length)
 
-  return reversed.join(' ');
-}
+        half_lines.push(first, second)
+      end
 
-Siz._Page.prototype.reverseLines = function() {
-  var reversed = this.groupWordsByCharLimit().reverse();
+      half_lines
+    end
 
-  return reversed.join('').trim();
-}
+    def get_half_lines_around_words(cpl = pick_cpl)
+      half_lines = []
 
-Siz._Page.prototype.halve = function(halver, splitText) {
-  if (halver == 'not around words') {
-    return this.splitIntoHalfLines(splitText);
-  } else if (halver == 'around words') {
-    return this.splitIntoHalfLinesAroundWords(splitText);
-  } else {
-    throw new Error("halve() does not understand " + halver)
-  }
-}
+      get_lines(cpl).each do |line|
+        split_line = line.split(/ /)
+        midpoint = (split_line.length / 2.0).ceil
+        first_arr = split_line.slice(0...midpoint)
+        second_arr = split_line.slice(midpoint, split_line.length)
+        first = first_arr.join(' ') + ' '
+        second = second_arr.join(' ') + ' '
 
-Siz._Page.prototype.burroughs = function(shuffler, halver) {
-  var lines = '';
-  var halves = '';
-  var quarters = '';
-  var shuffled = '';
-  var joined = '';
-  var splitText = this.getWords();
+        half_lines.push(first, second)
+      end
 
-  if (typeof shuffler === 'undefined') {
-    shuffler = _.shuffle;
-  }
+      half_lines
+    end
 
-  halves = this.halve(halver, splitText);
+    def get_quarter_lines(half_lines)
+      first_half = []
+      second_half = []
 
-  quarters = Siz._halfLinesIntoQuarters(halves); 
+      until (half_lines.empty?)
+        first_half.push(half_lines.shift)
+        if (half_lines[0])
+          second_half.push(half_lines.shift)
+        end
+      end
 
-  shuffled = shuffler(quarters);
-  joined = Siz._joinQuarters(shuffled); 
+      first_half_mid = (first_half.length / 2.0).floor
+      second_half_mid = (second_half.length / 2.0).floor
 
-  return joined.trim();
-}
+      first_quarter = first_half[0..first_half_mid-1]
+      second_quarter = second_half[0..second_half_mid-1]
+      third_quarter = first_half[first_half_mid..first_half.length]
+      fourth_quarter = second_half[second_half_mid..second_half.length]
 
-Siz._Page.prototype.burroughsSplit = function(shuffler) {
-  var halver = this.splitIntoHalfLines;
+      [first_quarter, second_quarter, third_quarter, fourth_quarter]
+    end
 
-  if (typeof shuffler === 'undefined') {
-    shuffler = _.shuffle;
-  }
+    def burroughs(half_lines, opts={})
+      shuffler = opts[:shuffler] || default_shuffler
+      cpl = opts[:cpl] || pick_cpl
 
-  this.burroughs(shuffler, halver);
-}
-
-Siz._Page.prototype.groupWordsByCharLimit = function() {
-  var line = "";
-  var lines = [];
-  var splitStringArr = this.getWords();
-  var limit = this.charsPerLine;
-
-  while (splitStringArr.length > 0) {
-    line = "";
-    while (line.length <= limit) {
-      if (splitStringArr.length > 0) {
-        line = line + splitStringArr.shift() + ' ';
-      } else {
-        line = line + ' ';
-      }
-    }
-    lines.push(line);
-  }
-
-  return lines;
-}
-
-Siz._Page.prototype.splitIntoHalfLines = function() {
-  var lines = this.groupWordsByCharLimit();
-  var halfLines = [];
-  var first = "";
-  var second = "";
-  var midpoint = 0;
-
-  lines.forEach(function (line) {
-    midpoint = Math.ceil(line.length / 2);
-    first = line.slice(0, midpoint);
-    second = line.slice(midpoint, line.length);
-
-    halfLines.push(first, second);
-  })
-
-  return halfLines;
-}
-
-Siz._Page.prototype.splitIntoHalfLinesAroundWords = function() {
-  var lines = this.groupWordsByCharLimit();
-  var halfLines = [];
-  var splitLine = [];
-  var firstArr = "";
-  var secondArr = "";
-  var first = "";
-  var second = "";
-  var midpoint = 0;
-
-  lines.forEach(function (line) {
-    splitLine = line.split(' ');
-    midpoint = Math.ceil(splitLine.length / 2);
-    firstArr = splitLine.slice(0, midpoint);
-    secondArr = splitLine.slice(midpoint, line.length);
-    first = firstArr.join(' ') + ' ';
-    second = secondArr.join(' ');
-
-    halfLines.push(first, second);
-  })
-
-  return halfLines;
-}
-
-
-Siz._halfLinesIntoQuarters = function(halfLines) {
-  var firstHalf = [];
-  var secondHalf = [];
-  var firstHalfMid = 0;
-  var secondHalfMid = 0;
-  var firstQuarter = [];
-  var secondQuarter = [];
-  var thirdQuarter = [];
-  var fourthQuarter = [];
-
-  while (halfLines.length > 0) {
-    firstHalf.push(halfLines.shift());
-    if (halfLines[0]) {
-      secondHalf.push(halfLines.shift());
-    }
-  }
-
-  firstHalfMid = Math.floor(firstHalf.length / 2);
-  secondHalfMid = Math.floor(secondHalf.length / 2);
-
-  firstQuarter = firstHalf.slice(0, firstHalfMid);
-  secondQuarter = secondHalf.slice(0, secondHalfMid);
-  thirdQuarter = firstHalf.slice(firstHalfMid, firstHalf.length);
-  fourthQuarter = secondHalf.slice(secondHalfMid, secondHalf.length);
-
-  return [firstQuarter, secondQuarter, thirdQuarter, fourthQuarter];
-}
-
-Siz._joinQuarters = function(quarters) {
-  var joined = "";
-  var half = [];
-
-  while (quarters.length > 0) {
-    half.push(quarters.shift()); 
-    half.push(quarters.shift()); 
-
-    while (half[0].length > 0 && half[1].length > 0) {
-      joined = joined + half[0].shift();
-      joined = joined + half[1].shift();
-    }
-
-    half = [];
-  }
-
-  return joined;
-}
+      shuffled_quarters = shuffler.call(get_quarter_lines(half_lines))
+      top = shuffled_quarters[0].zip(shuffled_quarters[1]).flatten.compact
+      bottom = shuffled_quarters[2].zip(shuffled_quarters[3]).flatten.compact
+      (top + bottom).join('').strip
+    end
+  end
+end
